@@ -1,0 +1,66 @@
+/* Task 1*/
+
+libname lib "/home/u62629012/sasuser.v94/Homework";
+
+data lib.A;
+	set lib.rdmcode;
+	by subjid studyid;
+run;
+
+data lib.B;
+	
+	set lib.demog;
+	by subjid studyid;
+run;
+
+data lib.C;
+	merge lib.A lib.B;
+	by subjid studyid;
+	attrib
+		USUBJID label = 'Unique Subject Identifier'         length = $50
+		AGE     label = 'AGE'                               length = 8
+		AGEU    label = 'Age Units'                         length = $5
+		RFSTDTC label = 'Subject Reference Start Date/Time' length = $10
+ 		ARM     label = 'Description of Planned Arm'        length = $8
+		ARMCD   label = 'Description of Planned Arm Code'   length = $1
+		;
+		USUBJID = STUDYID!!'-'!!SITEID!!'-'!!SUBJID;
+		AGE  = floor((VISITDT - BIRTHDT)/365.25);
+		AGEU = 'YEARS';
+		RFSTDTC=strip(put(DATERANDOMIZED, e8601da.));
+		ARM = upcase(XTRTMT);
+		ARMCD = TRTMT;
+proc print;
+run;
+
+/* 2.task*/
+
+proc sort data = lib.rdmcode out = lib.sorted; 
+	by DATERANDOMIZED;
+	proc print;
+run;
+
+/* Task 3*/
+
+data lib.D;
+	set lib.C (keep = ARM USUBJID DATERANDOMIZED);
+run;
+
+/*Task 4*/
+	
+data lib.E;
+	set lib.sorted;
+	retain  PTNUM;
+	attrib
+		PTNUM label =  'Patient Number'
+	;
+		
+	PTNUM=_N_;
+run;
+
+
+/* 5) */
+
+data lib.merged;
+	merge lib.E lib.C;
+run;
