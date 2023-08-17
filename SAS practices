@@ -1,0 +1,76 @@
+/* Home task 2 */
+/* 1) Keep only STUDYID, SUBJID, AENAME, AESTART, AELINENO variables. Sort by Patient, AE Start date, AE Line Number. Derive USUBJID; */
+
+libname lib "/home/u62629012/sasuser.v94/Homework";
+
+proc sort data=lib.AE;
+	by SUBJID AESTART AELINENO;
+run;
+
+data lib.AE_2 (keep = STUDYID SUBJID AENAME AESTART AELINENO USUBJID);
+	set lib.AE;
+	USUBJID = catx(" ", STUDYID, SITEID, SUBJID);
+run;
+
+/* 2) Find the earliest AE within EACH Patient/within ALL Patients. If multiple AEs occurred at the same date, take one with the minimum Line Number. Print the results; */
+
+data lib.AE_4 (keep = USUBJID STUDYID SITEID SUBJID AESTART AELINENO);
+	set lib.AE;
+	by  SUBJID AESTART AELINENO; 
+	USUBJID = catx(" ", STUDYID, SITEID, SUBJID);
+	if first.SUBJID then output;
+run;
+
+/* 3) Add information with earliest AE to raw DEMOG dataset (use USUBJID as a key); */
+
+proc sort data=lib.AE_4 out=lib.AE_5;
+	by USUBJID;
+run;
+
+
+data lib.DEMOG_1;
+	set lib.DEMOG;
+	USUBJID = catx(" ", STUDYID, SITEID, SUBJID);
+run;
+
+proc sort data=lib.DEMOG_1;
+	by USUBJID;
+run;
+
+data lib.DEMOG_2;
+	merge lib.AE_5 lib.DEMOG_1;
+	by USUBJID;
+run;
+
+/* 4) Keep only STUDYID USUBJID VISID ECGDATE ECGDIGTM. Find the latest timepoint within each patient within each visit. Add this information to the dataset from step 3; */
+
+data lib.ECGPRFL1_2;
+	set lib.ECGPRFL1;
+	USUBJID = catx(" ", STUDYID, SITEID, SUBJID);
+run;
+
+proc sort data=lib.ECGPRFL1_2 (keep=STUDYID VISID ECGDATE ECGDIGTM USUBJID);
+	by USUBJID VISID descending ECGDIGTM;
+run;
+
+
+data lib.ECGPRFL1_3;
+	merge  lib.DEMOG_2 lib.ECGPRFL1_2;
+	by USUBJID;
+run;
+
+/* 5) Keep only STUDYID USUBJID VISID ECGDATE ECGHOUR ECGDIGTM. Within each patient within each visit fill in the missing ECGDIGTM values with the LAST non-missing ECGDIGTM available.  */
+
+proc sort data=lib.ECGPRFL2  (keep=STUDYID SITEID SUBJID  VISID ECGDATE ECGHOUR ECGDIGTM);
+	by SUBJID VISID descending ECGDIGTM;
+run;
+
+data lib.ECGPRFL2_2;
+	set lib.ECGPRFL2;
+	by SUBJID VISID;
+	retain ECGDIGTM ECGDIGTM1;
+	USUBJID = catx(" ", STUDYID, SITEID, SUBJID);
+	
+	if not missing(ECGDIGTM) then ECGDIGTM1 = ECGDIGTM;
+	if missing(ECGDIGTM) then  ECGDIGTM = ECGDIGTM1;
+run;
