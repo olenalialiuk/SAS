@@ -1,0 +1,127 @@
+/* 1) Use raw dataset VITALS. Find the highest temperature value within all patients. Print the result to the LOG as a NOTE; */
+
+libname trials "/home/u62629012/sasuser.v94/trials";
+
+
+
+proc sort data = trials.VITALS out = trials.VITALS_SORTED;
+	by descending VSTEMP;
+run;
+
+data trials.VITALS1;
+	set trials.VITALS_SORTED;
+	by descending VSTEMP;
+
+	if _N_ eq 1 then 
+	putlog "NOTE: Highest temperature value is " VSTEMP;
+run;
+
+/* 2)В Use raw dataset FOLLOWUP. Count how many days each patient took cocaine, based on COCAIN_D variable. Create a new variable COCDAYS.В Leave single record per patient. Print the result; */
+
+proc sort data = trials.FOLLOWUP out = trials.FOLLOWUP_sorted;
+	by SUBJID COCAIN_D;
+run;
+
+data trials.FOLLOWUP1 (drop = COCAIN_D);
+	set trials.FOLLOWUP_sorted (keep = SUBJID COCAIN_D);
+	by SUBJID COCAIN_D;
+	retain COCDAYS;
+
+	COCDAYS = sum(COCDAYS,  COCAIN_D);
+	if last.SUBJID then output; 
+
+proc print;
+run;
+
+
+/* 3) Use raw dataset AE. Put a warning to the LOG in case an AE stop date is empty. Include information about a patient, AE name and AE start date; */
+
+
+data trials.AE1;
+	set trials.AE;
+	if missing(AESTOP) then putlog "WAR" "NING an AE stop date is empty "
+	SUBJID AENAME AESTART;
+	output; 
+run;
+
+
+/* 4) Use raw datasets RDMCODE and AE. Separate patients into 2 datasets by treatment groups. Count how many AEs are there in each treatment group. DO NOT use First and Last statements; */
+
+proc sort data=trials.RDMCODE out=trials.RDMCODE1;
+by subjid TRTMT;
+run;
+
+proc sort data=trials.AE out=trials.AE1;
+by subjid;
+run;
+
+
+data trials.A trials.B;
+  	merge trials.RDMCODE1 trials.AE1;
+	by SUBJID;
+	
+	if TRTMT = "B" then
+		output trials.B;
+	
+	
+	if TRTMT = "A" then
+		output trials.A;
+		
+proc print;	
+run;
+
+data trials.A;
+	set trials.A;
+  	by SUBJID;
+	count+1;
+proc print;	
+run;
+
+
+data trials.B;
+	set trials.B;
+  	by SUBJID;
+	count+1;
+proc print;	
+run;
+
+
+/* 5)В Use raw dataset ECG1. Consider Heart Rate characteristics only, others can be dropped. For each patient add 2 new visits with Min and MaxВ Heart Rate, create 2 new variables . */
+/*  Assign VISIT and VISITNUM so that Min Heart Rate would be the 1st record per subject, and MaxВ Heart Rate would be the last record per subject. For other records assignВ VISIT to VISID and VISITNUM to the day number in VISID; */
+
+proc sort data=trials.ECG1  (keep = SUBJID VISID ECGHRTRT) out=trials.ECG1_sorted;
+	by subjid ECGHRTRT;
+run;
+
+
+data trials.ECG1_2;
+  	set trials.ECG1_sorted;
+	by SUBJID ECGHRTRT;
+	if first.SUBJID then do;
+		VISIT = put(ECGHRTRT, best.);
+		VISITNUM =put('Min Heart Rate',best.);
+		output;
+	end;
+	if last.SUBJID then do;
+		VISIT = put(ECGHRTRT, best.);
+		VISITNUM = put('Max Heart Rate',best.);
+		output;
+	end;
+
+run;
+
+data trials.ECG1_2;
+  	set trials.ECG1_sorted;
+if first.SUBJID=0 or last.SUBJID=0 then do; 
+		VISIT=VISID;
+		VISITNUM = input(compress(VISID, , 'kd'), best.);
+		output;
+	end;
+run;
+
+
+
+
+
+
+
